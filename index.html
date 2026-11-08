@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Turnos de bebé</title>
+<meta name="theme-color" content="#f7a8b8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👶</text></svg>">
+<style>
+  :root{--bg:#fff7f9;--card:#fff;--ink:#3a2a30;--muted:#8a7379;--accent:#e86a8a;--accent2:#7bb7e0;--ok:#4caf7d;--line:#f0dbe1}
+  @media (prefers-color-scheme: dark){:root{--bg:#1d1619;--card:#2a2024;--ink:#f6e9ed;--muted:#b49aa2;--line:#3d2f34}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  main{max-width:520px;margin:0 auto;padding:16px 16px 48px}
+  h1{font-size:1.5rem;margin:8px 0 16px;text-align:center}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .card h2{font-size:1rem;margin:0 0 10px;color:var(--muted);font-weight:600}
+  button{font:inherit;border:0;border-radius:12px;padding:12px 16px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+  button.sec{background:var(--line);color:var(--ink)}
+  button.ok{background:var(--ok)}
+  button.danger{background:#d9534f}
+  button:disabled{opacity:.5}
+  input{font:inherit;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%;min-width:0}
+  .row{display:flex;gap:8px;align-items:center}
+  .row>*{flex:1}
+  .row>button{flex:0 0 auto}
+  .holder{text-align:center}
+  .holder .who{font-size:1.9rem;font-weight:800;margin:4px 0}
+  .timer{font-size:3.6rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:1px}
+  .timer.low{color:var(--accent)}
+  .bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin:8px 0 12px}
+  .bar>div{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));width:0}
+  .muted{color:var(--muted);font-size:.9rem}
+  ol{margin:0;padding:0;list-style:none}
+  li{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
+  li:last-child{border-bottom:0}
+  .num{width:28px;height:28px;border-radius:50%;background:var(--line);display:grid;place-items:center;font-size:.85rem;font-weight:700;flex:0 0 auto}
+  li.now .num{background:var(--accent);color:#fff}
+  .me{font-size:.75rem;background:var(--accent2);color:#fff;border-radius:8px;padding:2px 6px;margin-left:4px}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  #qr{display:flex;justify-content:center;margin-top:10px}
+  #qr img,#qr canvas{background:#fff;padding:8px;border-radius:8px}
+  .flash{animation:flash 1s ease-in-out 6}
+  @keyframes flash{50%{background:var(--accent);color:#fff}}
+  .banner{position:fixed;inset:0;background:rgba(232,106,138,.95);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;z-index:9;font-size:1.4rem}
+  .banner b{font-size:2.4rem;display:block;margin:10px 0}
+  .banner button{background:#fff;color:var(--accent);margin-top:20px}
+  .status{text-align:center;font-size:.8rem;color:var(--muted)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+  <h1>👶 Turnos para tener a la bebé</h1>
+
+  <!-- Sin sala -->
+  <section id="lobby" hidden>
+    <div class="card">
+      <h2>Crear una sala</h2>
+      <p class="muted">Crea la sala y pasa el enlace a tus amigos. No hace falta registrarse.</p>
+      <button id="create" style="width:100%">Crear sala nueva</button>
+    </div>
+    <div class="card">
+      <h2>¿Ya tienes un código?</h2>
+      <div class="row"><input id="codeIn" placeholder="Código de sala"><button id="goCode" class="sec">Entrar</button></div>
+    </div>
+  </section>
+
+  <!-- Sala -->
+  <section id="room" hidden>
+    <div class="card holder" id="holderCard">
+      <div class="muted" id="holderLabel">Ahora la tiene</div>
+      <div class="who" id="who">—</div>
+      <div class="timer" id="timer">--:--</div>
+      <div class="bar"><div id="barFill"></div></div>
+      <div class="muted" id="nextLabel"></div>
+      <div class="btns" style="margin-top:12px">
+        <button id="startBtn" class="ok">▶ Empezar</button>
+        <button id="stopBtn" class="sec">⏸ Parar</button>
+        <button id="nextBtn" class="sec">⏭ Pasar al siguiente</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Mi turno</h2>
+      <div id="joinBox" class="row">
+        <input id="nameIn" placeholder="Tu nombre" maxlength="24" autocomplete="given-name">
+        <button id="joinBtn">Apuntarme</button>
+      </div>
+      <div id="leaveBox" hidden>
+        <p id="myPos" style="margin:0 0 10px"></p>
+        <button id="leaveBtn" class="danger" style="width:100%">Renunciar (salir de la lista)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Lista de turnos</h2>
+      <ol id="queue"></ol>
+      <p class="muted" id="emptyQ">Todavía no hay nadie apuntado.</p>
+    </div>
+
+    <div class="card">
+      <h2>Duración de cada ronda</h2>
+      <div class="row">
+        <input id="minIn" type="number" min="0.5" step="0.5" inputmode="decimal">
+        <span style="flex:0 0 auto">min</span>
+        <button id="minBtn" class="sec">Guardar</button>
+      </div>
+      <p class="muted" id="minNow" style="margin-bottom:0"></p>
+    </div>
+
+    <div class="card">
+      <h2>Avisos</h2>
+      <button id="alertsBtn" style="width:100%">🔔 Activar sonido y avisos</button>
+      <p class="muted">Deja esta página abierta. Para recibir avisos con el móvil bloqueado, instala la app gratuita
+        <a href="https://ntfy.sh/" target="_blank" rel="noopener">ntfy</a> y suscríbete al tema
+        <b id="pushTopic"></b> (<a id="pushLink" target="_blank" rel="noopener">abrir</a>).</p>
+    </div>
+
+    <div class="card">
+      <h2>Invitar a más gente</h2>
+      <div class="row"><input id="shareUrl" readonly><button id="copyBtn" class="sec">Copiar</button></div>
+      <div class="btns" style="margin-top:8px">
+        <button id="waBtn" class="sec">Enviar por WhatsApp</button>
+        <button id="exitBtn" class="sec">Salir de la sala</button>
+      </div>
+      <div id="qr"></div>
+    </div>
+    <p class="status" id="status">Conectando…</p>
+  </section>
+</main>
+
+<div class="banner" id="banner">
+  <div>⏰ ¡Se acabó el tiempo!</div>
+  <div>Ahora le toca a <b id="bannerWho"></b></div>
+  <button id="bannerOk">Vale</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(() => {
+  const NTFY = new URLSearchParams(location.search).get('ntfy') || 'https://ntfy.sh';
+  const $ = id => document.getElementById(id);
+  const ls = {
+    get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+    set(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+  };
+
+  // ---------- Sala ----------
+  const code = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+  if (!code) { showLobby(); return; }
+  const topic = 'bebeturnos-' + code;
+  const pushTopic = topic + '-avisos';
+
+  let myId = ls.get('bt-id');
+  if (!myId) { myId = Math.random().toString(36).slice(2, 10); ls.set('bt-id', myId); }
+  $('nameIn').value = ls.get('bt-name') || '';
+
+  // ---------- Estado (se reconstruye a partir de los eventos) ----------
+  const S = { minutes: 5, queue: [], running: false, round: 0, roundStart: 0, pausedLeft: null };
+  const seen = new Set();
+  let offset = 0;            // diferencia reloj servidor - reloj local (ms)
+  let live = false;          // ya hemos cargado el historial
+  let alarmedRound = -1;
+  let audioCtx = null;
+
+  function apply(ev, t) {    // t = hora del servidor en segundos
+    const q = S.queue;
+    const idx = ev.id ? q.findIndex(p => p.id === ev.id) : -1;
+    const prevRound = S.round;
+    switch (ev.t) {
+      case 'join':
+        if (idx < 0) q.push({ id: ev.id, name: String(ev.name || '?').slice(0, 24) });
+        else q[idx].name = String(ev.name || '?').slice(0, 24);
+        break;
+      case 'leave':
+        if (idx < 0) break;
+        q.splice(idx, 1);
+        if (idx === 0) S.pausedLeft = null;
+        if (idx === 0 && S.running) { S.round++; S.roundStart = t; }
+        if (!q.length) S.running = false;
+        break;
+      case 'config':
+        if (ev.minutes > 0 && ev.minutes <= 600) S.minutes = ev.minutes;
+        break;
+      case 'start':
+        if (!S.running && q.length) {
+          S.running = true; S.round++;
+          S.roundStart = S.pausedLeft != null ? t - (S.minutes * 60 - S.pausedLeft) : t;
+          S.pausedLeft = null;
+        }
+        break;
+      case 'stop':
+        if (S.running) {
+          S.running = false;
+          S.pausedLeft = Math.max(0, S.roundStart + S.minutes * 60 - t);
+        }
+        break;
+      case 'next':
+        if (ev.round === S.round && q.length) {
+          q.push(q.shift());
+          S.pausedLeft = null;
+          if (S.running) { S.round++; S.roundStart = t; }
+          else S.round++;
+        }
+        break;
+    }
+    return S.round !== prevRound;
+  }
+
+  function handle(msg) {
+    if (!msg || msg.event !== 'message' || seen.has(msg.id)) return;
+    seen.add(msg.id);
+    if (live) {
+      const sample = msg.time * 1000 - Date.now();
+      if (Math.abs(sample) < 6 * 3600e3 && sample > offset) offset = sample;
+    }
+    let ev; try { ev = JSON.parse(msg.message); } catch (e) { return; }
+    const holderBefore = S.queue[0] && S.queue[0].id;
+    const changed = apply(ev, msg.time);
+    if (live && changed && S.running && S.queue.length) {
+      const h = S.queue[0];
+      if (alarmedRound !== S.round - 1 && h.id !== holderBefore) alarm(h, ev.t === 'next' && ev.auto);
+      alarmedRound = Math.max(alarmedRound, S.round - 1);
+    }
+    render();
+  }
+
+  // ---------- Red ----------
+  async function send(ev) {
+    try {
+      await fetch(NTFY + '/', { method: 'POST', body: JSON.stringify({ topic, message: JSON.stringify(ev) }) });
+    } catch (e) { setStatus('⚠️ No se pudo enviar. ¿Hay conexión?'); }
+  }
+  function sendPush(text) {
+    fetch(NTFY + '/', { method: 'POST', body: JSON.stringify({
+      topic: pushTopic, title: '👶 Cambio de turno', message: text, priority: 5, tags: ['baby']
+    }) }).catch(() => {});
+  }
+
+  async function connect() {
+    let lastId = null;
+    try {
+      const r = await fetch(`${NTFY}/${topic}/json?poll=1&since=all`);
+      const txt = await r.text();
+      for (const line of txt.split('\n')) {
+        if (!line.trim()) continue;
+        try { const m = JSON.parse(line); handle(m); if (m.event === 'message') lastId = m.id; } catch (e) {}
+      }
+    } catch (e) { setStatus('⚠️ Sin conexión, reintentando…'); }
+    alarmedRound = S.round;
+    live = true;
+    render();
+    const es = new EventSource(`${NTFY}/${topic}/sse?since=${lastId || 'all'}`);
+    es.onopen = () => setStatus('🟢 Conectado — todos ven lo mismo en tiempo real');
+    es.onerror = () => setStatus('🟠 Reconectando…');
+    es.onmessage = e => { try { handle(JSON.parse(e.data)); } catch (err) {} };
+  }
+
+  // ---------- Avisos ----------
+  function beep() {
+    if (!audioCtx) return;
+    const now = audioCtx.currentTime;
+    for (let i = 0; i < 6; i++) {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'triangle'; o.frequency.value = i % 2 ? 660 : 880;
+      g.gain.setValueAtTime(0.0001, now + i * 0.35);
+      g.gain.exponentialRampToValueAtTime(0.6, now + i * 0.35 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.35 + 0.3);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(now + i * 0.35); o.stop(now + i * 0.35 + 0.32);
+    }
+  }
+  function alarm(holder) {
+    beep();
+    if (navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 600]);
+    const mine = holder.id === myId;
+    const text = mine ? '¡Te toca a ti coger a la bebé! 👶' : `Ahora le toca a ${holder.name}`;
+    try {
+      if ('Notification' in window && Notification.permission === 'granted')
+        new Notification('⏰ Cambio de turno', { body: text, tag: 'bebe', renotify: true });
+    } catch (e) {}
+    $('bannerWho').textContent = mine ? '¡TI! 🙌' : holder.name;
+    $('banner').style.display = 'flex';
+    clearTimeout(alarm.t); alarm.t = setTimeout(() => { $('banner').style.display = 'none'; }, 20000);
+    $('holderCard').classList.remove('flash'); void $('holderCard').offsetWidth;
+    $('holderCard').classList.add('flash');
+  }
+  $('bannerOk').onclick = () => { $('banner').style.display = 'none'; };
+
+  $('alertsBtn').onclick = async () => {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      await audioCtx.resume();
+    } catch (e) {}
+    try { if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission(); } catch (e) {}
+    wakeLock();
+    beep();
+    $('alertsBtn').textContent = '✅ Avisos activados (prueba de sonido)';
+    $('alertsBtn').className = 'ok';
+  };
+  let lock = null;
+  async function wakeLock() {
+    try { if ('wakeLock' in navigator && !lock) { lock = await navigator.wakeLock.request('screen'); lock.onrelease = () => { lock = null; }; } } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && audioCtx) wakeLock(); });
+
+  // ---------- Temporizador ----------
+  const serverNow = () => (Date.now() + offset) / 1000;
+  function left() {
+    if (S.running) return S.roundStart + S.minutes * 60 - serverNow();
+    return S.pausedLeft != null ? S.pausedLeft : S.minutes * 60;
+  }
+  setInterval(() => {
+    renderTimer();
+    if (!live || !S.running || !S.queue.length) return;
+    if (left() <= 0) {
+      const round = S.round;
+      if (alarmedRound === round) return;
+      alarmedRound = round;
+      const next = S.queue[1] || S.queue[0];
+      alarm(next);
+      // Uno de los móviles avanza el turno (espera aleatoria para no duplicar)
+      setTimeout(() => {
+        if (S.round === round && S.running) {
+          send({ t: 'next', round, auto: true });
+          sendPush(`⏰ ¡Tiempo! Ahora le toca a ${next.name}`);
+        }
+      }, 300 + Math.random() * 1700);
+    }
+  }, 250);
+
+  // ---------- Render ----------
+  const fmt = s => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  function renderTimer() {
+    const l = left();
+    $('timer').textContent = S.queue.length ? fmt(l) : '--:--';
+    $('timer').classList.toggle('low', S.running && l < 30);
+    $('barFill').style.width = S.queue.length ? (100 * (1 - Math.max(0, l) / (S.minutes * 60))) + '%' : '0';
+  }
+  function render() {
+    const q = S.queue, h = q[0];
+    $('who').textContent = h ? (h.id === myId ? `${h.name} (tú)` : h.name) : '—';
+    $('holderLabel').textContent = !h ? 'Apuntaos para empezar' : S.running ? 'Ahora la tiene' : 'En pausa · le toca a';
+    $('nextLabel').textContent = q.length > 1 ? `Siguiente: ${q[1].name}` : '';
+    $('startBtn').hidden = S.running; $('startBtn').disabled = !q.length;
+    $('stopBtn').hidden = !S.running;
+    $('nextBtn').disabled = q.length < 2;
+    const list = $('queue'); list.innerHTML = '';
+    q.forEach((p, i) => {
+      const li = document.createElement('li');
+      if (i === 0) li.className = 'now';
+      const n = document.createElement('span'); n.className = 'num'; n.textContent = i + 1;
+      const name = document.createElement('span'); name.textContent = p.name;
+      li.append(n, name);
+      if (p.id === myId) { const t = document.createElement('span'); t.className = 'me'; t.textContent = 'tú'; li.append(t); }
+      if (i === 0) { const t = document.createElement('span'); t.textContent = '👶'; t.style.marginLeft = 'auto'; li.append(t); }
+      list.append(li);
+    });
+    $('emptyQ').hidden = q.length > 0;
+    const myIdx = q.findIndex(p => p.id === myId);
+    $('joinBox').hidden = myIdx >= 0; $('leaveBox').hidden = myIdx < 0;
+    $('myPos').textContent = myIdx === 0 ? '👶 ¡Ahora es tu turno!' : myIdx > 0 ? `Estás en la posición ${myIdx + 1}. Faltan ${myIdx} turno(s).` : '';
+    if (document.activeElement !== $('minIn')) $('minIn').value = S.minutes;
+    $('minNow').textContent = `Ahora: ${S.minutes} min por ronda. Cualquiera puede cambiarlo.`;
+    renderTimer();
+  }
+  function setStatus(t) { $('status').textContent = t; }
+
+  // ---------- Acciones ----------
+  $('joinBtn').onclick = () => {
+    const name = $('nameIn').value.trim();
+    if (!name) { $('nameIn').focus(); return; }
+    ls.set('bt-name', name);
+    send({ t: 'join', id: myId, name });
+    if (!audioCtx) $('alertsBtn').click();
+  };
+  $('nameIn').onkeydown = e => { if (e.key === 'Enter') $('joinBtn').click(); };
+  $('leaveBtn').onclick = () => { if (confirm('¿Seguro que quieres renunciar y salir de la lista?')) send({ t: 'leave', id: myId }); };
+  $('startBtn').onclick = () => send({ t: 'start' });
+  $('stopBtn').onclick = () => send({ t: 'stop' });
+  $('nextBtn').onclick = () => {
+    if (confirm(`¿Pasar ya el turno a ${S.queue[1] ? S.queue[1].name : 'la siguiente persona'}?`)) {
+      send({ t: 'next', round: S.round });
+      if (S.queue[1]) sendPush(`Ahora le toca a ${S.queue[1].name}`);
+    }
+  };
+  $('minBtn').onclick = () => {
+    const m = parseFloat(String($('minIn').value).replace(',', '.'));
+    if (!(m > 0 && m <= 600)) { alert('Pon un número de minutos válido'); return; }
+    send({ t: 'config', minutes: Math.round(m * 2) / 2 || 0.5 });
+    $('minIn').blur();
+  };
+
+  // ---------- Compartir ----------
+  const url = location.href.split('#')[0] + '#' + code;
+  $('shareUrl').value = url;
+  $('copyBtn').onclick = async () => {
+    try { await navigator.clipboard.writeText(url); } catch (e) { $('shareUrl').select(); document.execCommand('copy'); }
+    $('copyBtn').textContent = '¡Copiado!'; setTimeout(() => $('copyBtn').textContent = 'Copiar', 1500);
+  };
+  $('waBtn').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent('👶 Apúntate a la lista para coger a la bebé: ' + url), '_blank');
+  $('exitBtn').onclick = () => { location.hash = ''; location.reload(); };
+  $('pushTopic').textContent = pushTopic;
+  $('pushLink').href = `${NTFY}/${pushTopic}`;
+  try { new QRCode($('qr'), { text: url, width: 180, height: 180 }); } catch (e) {}
+
+  $('room').hidden = false;
+  render();
+  connect();
+
+  function showLobby() {}
+})();
+
+// Pantalla inicial (sin sala)
+if (!location.hash.slice(1)) {
+  const el = id => document.getElementById(id);
+  el('lobby').hidden = false;
+  el('create').onclick = () => {
+    const words = ['nube', 'osito', 'luna', 'mimo', 'pato', 'chupe', 'cuna', 'baba'];
+    const c = words[Math.floor(Math.random() * words.length)] + '-' + Math.random().toString(36).slice(2, 7);
+    location.hash = c; location.reload();
+  };
+  el('goCode').onclick = () => { const c = el('codeIn').value.trim(); if (c) { location.hash = c; location.reload(); } };
+}
+window.addEventListener('hashchange', () => location.reload());
+</script>
+</body>
+</html>
